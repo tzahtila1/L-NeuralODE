@@ -29,10 +29,12 @@ data_cfg  = init.DataConfig(
 )
 
 train_cfg  = init.TrainConfig(
-    max_iters     = 200_000,
-    network_width = 800,
-    curric_tol    = 0.0001,
-    learning_rate = 1e-3
+    max_iters            = 200_000,
+    network_width        = 800,
+    curric_tol           = 0.0001,
+    learning_rate        = 1e-3,
+    test_train_split     = 0.8,
+    batch_size           = 20
 )
 
 
@@ -40,7 +42,13 @@ config = init.NodeConfig(param_cfg = param_cfg, data_cfg=data_cfg, train_cfg=tra
 
 
 #%% Pre-process the data
+
+#scale data
 preprocess.scale_inputs_trajectories(data_cfg, param_cfg, config.param_cfg.xi, config.data_cfg.trajectories)
+
+#test train split
+preprocess.test_train_split(data_cfg, train_cfg)
+
 
 #%% Train the model
 train.train(config, 
@@ -50,7 +58,11 @@ train.train(config,
             trajectories    = data_cfg.trajectories_scaled, 
             max_iters       = train_cfg.max_iters, 
             curric_tol      = train_cfg.curric_tol,
+            lr              = train_cfg.learning_rate,
             xi_scaled       = param_cfg.xi_scaled)
 
 
 #%% Next steps
+#1. 
+#2. Clean the code.
+#3. View results/output

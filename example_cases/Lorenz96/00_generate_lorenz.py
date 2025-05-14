@@ -22,7 +22,7 @@ t_eval      = np.linspace(*t_span, Nt)
 eps     = 1e-3
 fig,ax  = plt.subplots(N,1, figsize=(10, 6))
  
-F_set   = np.arange(1,3 + eps,0.02)
+F_set   = np.arange(1,1.5 + eps,0.005)
 Nf      = len(F_set)
 
 A   = np.zeros((Nt, N, Nf))

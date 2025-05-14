@@ -10,6 +10,33 @@ def minmax_scale(data):
     scaled_data = (data - min_val) / (max_val - min_val)
     return scaled_data, min_val, max_val
 
+
+def test_train_split(data_cfg, train_cfg):
+    Ntrain     = int(train_cfg.test_train_split*data_cfg.Nruns)
+    
+    train_inds = np.random.choice(data_cfg.Nruns, size=Ntrain, replace=False)
+    # Your original selection
+    # Create a set of all possible numbers
+    all_numbers = set(range(data_cfg.Nruns))
+    print(len(all_numbers))
+    # Create a set of the selected numbers
+    selected_set = set(train_inds)
+    
+    print(len(selected_set))
+    # Get the complement (all numbers that weren't selected)
+    complement = list(all_numbers - selected_set)
+    val_inds = np.array(complement)
+
+    
+    train_cfg.train_inds = train_inds
+    train_cfg.val_inds   = val_inds
+    
+    train_cfg.Ntrain = len(train_inds)
+    train_cfg.Nval   = len(val_inds)
+    
+    return
+
+
 # Function to unscale the data back to its original range
 def unscale_data(scaled_data, min_val, max_val):
     # Revert the scaled data back to the original scale

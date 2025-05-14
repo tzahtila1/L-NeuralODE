@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import sys
 
 #%% Perform Neural ODE training
-def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curric_tol,xi_scaled):
+def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curric_tol, lr, xi_scaled):
     def rk4(func, t, dt, y, m):
         _one_sixth = 1/6
         half_dt = dt * 0.5
@@ -68,20 +68,31 @@ def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curri
             return output
         
     #% Initialize Model and Optimizer
-    node = NeuralODE(func=ODEFunc()) # Move Neural ODE to GPU
-    optimizer = optim.Adam(node.parameters(), lr=1e-4)
+    node        = NeuralODE(func=ODEFunc()) # Move Neural ODE to GPU
+    optimizer = optim.Adam(node.parameters(), lr=lr)
 
 
-    trajectories = torch.from_numpy(trajectories)
+    #%% Training setup
+    train_i         = config.train_cfg.train_inds
+    val_i           = config.train_cfg.val_inds
+    
+    train_trajects  = trajectories[:,:,train_i]
+    val_trajects    = trajectories[:,:,val_i]
+    
+    train_xi        = xi_scaled[:,train_i]
+    val_xi          = xi_scaled[:,val_i]
+    
+    train_trajects  = torch.from_numpy(train_trajects)
+    val_trajects    = torch.from_numpy(val_trajects)
     
     #% Curriculum Learning Setup
-    tsi, t_samples, loss, upper_ind, t = preprocess.determine_curriculum_times(trajectories)
+    tsi, t_samples, loss, upper_ind, t = preprocess.determine_curriculum_times(train_trajects)
+    
+    batch_size     = config.train_cfg.batch_size
+    
     #%% Training Loop
     loss_func       = []
     img_itr         = 0
-    # Nruns           = latent_params['params'].shape[1]
-    NumTraining     = 95  # Leave the complement for validation
-
 
 
     for iter in range(max_iters + 1):
@@ -99,20 +110,21 @@ def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curri
 
         optimizer.zero_grad()
 
-        batch_ind      = np.array(np.round(np.random.rand(NumTraining)*(NumTraining-1))[:], int)
+        batch_ind      = np.random.choice(config.train_cfg.Ntrain, size=batch_size, replace=False)
+
         
-        input_xi = xi_scaled[:,batch_ind]
+        input_xi = train_xi[:,batch_ind]
         
         # Generate arguments
       
-        batch_y0 = trajectories[0,:, batch_ind].t()
+        batch_y0 = train_trajects[0,:, batch_ind].t()
         batch_y0 = batch_y0.unsqueeze(1)
         
 
          
         batch_t = t[:]
         
-        batch_y  = trajectories[:,:, batch_ind]
+        batch_y  = train_trajects[:,:, batch_ind]
 
         batch_y  = batch_y.permute(0, 2, 1)
         
@@ -144,16 +156,16 @@ def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curri
                 # Select parameteters
                 ind     = [0,1,2,3,4]#,-3,-2,-1]
             
-                input_xi = xi_scaled[:,ind]
+                input_xi = train_xi[:,ind]
                 
                 
                 # Generate arguments
-                batch_y0 = trajectories[0,:, ind].t()
+                batch_y0 = train_trajects[0,:, ind].t()
                 batch_y0 = batch_y0.unsqueeze(1)
                  
                 batch_t = t[:]
                 
-                batch_y  = trajectories[:,:, ind]
+                batch_y  = train_trajects[:,:, ind]
 
                 batch_y  = batch_y.permute(0, 2, 1)
 
@@ -171,8 +183,7 @@ def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curri
                 pred_y = pred_y.squeeze(-1).squeeze(2)
                    
                 #%% Full data
-                
-                visualization.viz_training(ax, batch_t, batch_y, pred_y, t, trajectories, img_itr)
+                visualization.viz_training(ax, batch_t, batch_y, pred_y, t, train_trajects, img_itr)
                 
                 loss = torch.mean(torch.abs(pred_y - batch_y)**2)
                 print('Iter {:04d} | Total Loss {:.6f}'.format(iter, loss.item()))

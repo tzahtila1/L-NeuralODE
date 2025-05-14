@@ -23,13 +23,13 @@ def viz_training(ax, batch_t, batch_y, pred_y, t, trajectories_scaled, img_itr):
     except:
         pass
     
-    # Visualize full t
-    itr = 0 
-    for i in range(2):
-        for j in range(2):
-            ax[i,j].plot(t, trajectories_scaled[:,itr,:].detach().cpu().numpy(), '-', color = 'grey', alpha = 0.1)
+    # # Visualize full t
+    # itr = 0 
+    # for i in range(2):
+    #     for j in range(2):
+    #         ax[i,j].plot(t, trajectories_scaled[:,itr,:].detach().cpu().numpy(), '-', color = 'grey', alpha = 0.1)
             
-            itr+=1
+    #         itr+=1
     #%% V1
     
     ax[0,0].plot(batch_t.numpy(), batch_y.numpy()[:, 0, 0], 'ko', ms = 2, label = 'Training')
