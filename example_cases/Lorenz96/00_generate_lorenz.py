@@ -24,8 +24,8 @@ fig,ax  = plt.subplots(N,1, figsize=(10, 6))
  
 F_set   = np.arange(1,3 + eps,0.02)
 Nf      = len(F_set)
-A   = np.zeros((Nf, Nt, N))
 
+A   = np.zeros((Nt, N, Nf))
 itr = 0 
 for F in F_set:
     x0 = F * np.ones(N)
@@ -41,9 +41,9 @@ for F in F_set:
         ax[i].set_ylabel('x' + str(i))
     plt.xlabel('Time')
     
-    A[itr,:,:]  = sol['y'].transpose()
+    A[:,:,itr]  = sol['y'].transpose()
     
     itr += 1
 
 plt.savefig('./00_lorenz_trajectories.png',dpi = 200)
-np.savez('A_training.npz', A = A, t = sol['t'])
+np.savez('A_training.npz', A = A, t = sol['t'], F_set = F_set)
