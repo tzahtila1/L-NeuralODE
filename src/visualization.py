@@ -16,118 +16,57 @@ def use_tex():
         
     return
 
-def viz_training(ax, batch_t, batch_y, pred_y, t, trajectories_scaled, img_itr):
+def viz_training(batch_t, batch_y_train, pred_y_train,batch_y_val, pred_y_val, t, img_itr):
     #Style
     try:
         use_tex()
     except:
         pass
     
-    # # Visualize full t
-    # itr = 0 
-    # for i in range(2):
-    #     for j in range(2):
-    #         ax[i,j].plot(t, trajectories_scaled[:,itr,:].detach().cpu().numpy(), '-', color = 'grey', alpha = 0.1)
-            
-    #         itr+=1
-    #%% V1
+    fig, ax = plt.subplots(2,2)
+    plt.subplots_adjust(wspace = 0.3)
     
-    ax[0,0].plot(batch_t.numpy(), batch_y.numpy()[:, 0, 0], 'ko', ms = 2, label = 'Training')
-    ax[0,0].plot(batch_t.numpy(), pred_y.numpy()[:, 0, 0], 'r-', linewidth = 1)
-    
-    ax[0,0].plot(batch_t.numpy(), batch_y.numpy()[:, 1, 0], 'ko', markerfacecolor = 'None', ms = 2, linewidth = 3)
-    ax[0,0].plot(batch_t.numpy(), pred_y.numpy()[:, 1, 0], 'r-', linewidth = 1)
+    t = batch_t.numpy()
+    y_train = batch_y_train.numpy()
+    py_train = pred_y_train.numpy()
+    y_val = batch_y_val.numpy()
+    py_val = pred_y_val.numpy()
 
-    if False:
-        ax[0,0].plot(batch_t.numpy(), batch_y.numpy()[:, -1, 0], 'bo', markerfacecolor = 'None', ms = 2, label = 'Validation')
-        ax[0,0].plot(batch_t.numpy(), pred_y.numpy()[:, -1, 0], 'r-', linewidth = 1)
-    
-        ax[0,0].plot(batch_t.numpy(), batch_y.numpy()[:, -2, 0], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[0,0].plot(batch_t.numpy(), pred_y.numpy()[:, -2, 0], 'r-', linewidth = 1)
-    
-        ax[0,0].plot(batch_t.numpy(), batch_y.numpy()[:, -3, 0], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[0,0].plot(batch_t.numpy(), pred_y.numpy()[:, -3, 0], 'r-', linewidth = 1)
+    for i in range(4):
+        row, col = divmod(i, 2)
+        
+        # Training data
+        ax[row, col].plot(t, y_train[:, 0, i], 'ks', markerfacecolor='None', ms=3, label='Training' if i == 0 else None)
+        ax[row, col].plot(t, py_train[:, 0, i], 'r-', linewidth=1)
+        
+        ax[row, col].plot(t, y_train[:, 1, i], 'ks', markerfacecolor='None', ms=3, linewidth=1)
+        ax[row, col].plot(t, py_train[:, 1, i], 'r-', linewidth=1)
+        
+        # Validation data
+        ax[row, col].plot(t, y_val[:, 0, i], 'bo', markerfacecolor='None', ms=3, label='Validation' if i == 0 else None)
+        ax[row, col].plot(t, py_val[:, 0, i], 'r--', linewidth=1)
+        
+        ax[row, col].plot(t, y_val[:, 1, i], 'bo', markerfacecolor='None', ms=3, linewidth=1)
+        ax[row, col].plot(t, py_val[:, 1, i], 'r--', linewidth=1)
 
-    ax[0,0].set_xlabel(r'$t$')
-    ax[0,0].set_ylabel(r'$v_1$')
+        ax[row, col].set_xlabel(r'$t$')
+        ax[row, col].set_ylabel(f'$v_{i+1}$')
 
-    ax[0,0].legend()
-    
-    #%% V2
-    
-    ax[0,1].plot(batch_t.numpy(), batch_y.numpy()[:, 0, 1], 'ko', markerfacecolor = 'None', ms = 2, linewidth = 3)
-    ax[0,1].plot(batch_t.numpy(), pred_y.numpy()[:, 0, 1], 'r-', linewidth = 1)
-    
-    ax[0,1].plot(batch_t.numpy(), batch_y.numpy()[:, 1, 1], 'ko', markerfacecolor = 'None', ms = 2, linewidth = 3)
-    ax[0,1].plot(batch_t.numpy(), pred_y.numpy()[:, 1, 1], 'r-', linewidth = 1)
+    ax[0, 0].legend()
 
-    if False:
-        ax[0,1].plot(batch_t.numpy(), batch_y.numpy()[:, -1, 1], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[0,1].plot(batch_t.numpy(), pred_y.numpy()[:, -1, 1], 'r-', linewidth = 1)
     
-        ax[0,1].plot(batch_t.numpy(), batch_y.numpy()[:, -2, 1], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[0,1].plot(batch_t.numpy(), pred_y.numpy()[:, -2, 1], 'r-', linewidth = 1)
-    
-        ax[0,1].plot(batch_t.numpy(), batch_y.numpy()[:, -3, 1], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[0,1].plot(batch_t.numpy(), pred_y.numpy()[:, -3, 1], 'r-', linewidth = 1)
-
-    ax[0,1].set_xlabel(r'$t$')
-    ax[0,1].set_ylabel(r'$v_2$')
-
-    #%% V3
-    
-    ax[1,0].plot(batch_t.numpy(), batch_y.numpy()[:, 0, 2], 'ko', markerfacecolor = 'None', ms = 2, linewidth = 3)
-    ax[1,0].plot(batch_t.numpy(), pred_y.numpy()[:, 0, 2], 'r-', linewidth = 1)
-    
-    ax[1,0].plot(batch_t.numpy(), batch_y.numpy()[:, 1, 2], 'ko', markerfacecolor = 'None', ms = 2, linewidth = 3)
-    ax[1,0].plot(batch_t.numpy(), pred_y.numpy()[:, 1, 2], 'r-', linewidth = 1)
-
-    if False:
-        ax[1,0].plot(batch_t.numpy(), batch_y.numpy()[:, -1, 2], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[1,0].plot(batch_t.numpy(), pred_y.numpy()[:, -1, 2], 'r-', linewidth = 1)
-    
-        ax[1,0].plot(batch_t.numpy(), batch_y.numpy()[:, -2, 2], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[1,0].plot(batch_t.numpy(), pred_y.numpy()[:, -2, 2], 'r-', linewidth = 1)
-    
-        ax[1,0].plot(batch_t.numpy(), batch_y.numpy()[:, -3, 2], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[1,0].plot(batch_t.numpy(), pred_y.numpy()[:, -3, 2], 'r-', linewidth = 1)
-
-    ax[1,0].set_xlabel(r'$t$')
-    ax[1,0].set_ylabel(r'$v_3$')
-
-    #%% V4
-    
-    ax[1,1].plot(batch_t.numpy(), batch_y.numpy()[:, 0, 3], 'ko', markerfacecolor = 'None', ms = 2, linewidth = 3)
-    ax[1,1].plot(batch_t.numpy(), pred_y.numpy()[:, 0, 3], 'r-', linewidth = 1)
-    
-    ax[1,1].plot(batch_t.numpy(), batch_y.numpy()[:, 1, 3], 'ko', markerfacecolor = 'None', ms = 2, linewidth = 3)
-    ax[1,1].plot(batch_t.numpy(), pred_y.numpy()[:, 1, 3], 'r-', linewidth = 1)
-
-    if False:
-        ax[1,1].plot(batch_t.numpy(), batch_y.numpy()[:, -1, 3], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[1,1].plot(batch_t.numpy(), pred_y.numpy()[:, -1, 3], 'r-', linewidth = 1)
-    
-        ax[1,1].plot(batch_t.numpy(), batch_y.numpy()[:, -2, 3], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[1,1].plot(batch_t.numpy(), pred_y.numpy()[:, -2, 3], 'r-', linewidth = 1)
-    
-        ax[1,1].plot(batch_t.numpy(), batch_y.numpy()[:, -3, 3], 'bo', markerfacecolor = 'None', ms = 2)
-        ax[1,1].plot(batch_t.numpy(), pred_y.numpy()[:, -3, 3], 'r-', linewidth = 1)
-
-    ax[1,1].set_xlabel(r'$t$')
-    ax[1,1].set_ylabel(r'$v_4$')
-    
-
     for i in range(2):
         for j in range(2):
             ax[i,j].set_xlim([0.0,1.0])
             ax[i,j].set_ylim([0.0, 1.0])
     
-    save_dir = './training_images'
+    save_dir = './output/training_images'
     os.makedirs(save_dir, exist_ok=True)
 
     # plt.text(s = 'mass =' + str(m), x = 5.0, y = 0.8)
-    plt.savefig('./training_images/' + '{:03d}'.format(img_itr), dpi=400)
-    np.savez('./training_images/data_' + '{:03d}'.format(img_itr), batch_t = batch_t, batch_y = batch_y, pred_y = pred_y, trajectories_scaled = trajectories_scaled, t = t)
+    plt.savefig('./output/training_images/' + '{:03d}'.format(img_itr), dpi=400)
+    # np.savez('./training_images/data_' + '{:03d}'.format(img_itr))
     
+    plt.close('all')
 
     return

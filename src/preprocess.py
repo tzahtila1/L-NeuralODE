@@ -2,6 +2,8 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+
 def minmax_scale(data):
     min_val = np.min(data, axis=0, keepdims=True)  # Compute minimum along the columns
     max_val = np.max(data, axis=0, keepdims=True)  # Compute maximum along the columns
@@ -11,7 +13,7 @@ def minmax_scale(data):
     return scaled_data, min_val, max_val
 
 
-def test_train_split(data_cfg, train_cfg):
+def test_train_split(param_cfg, data_cfg, train_cfg):
     Ntrain     = int(train_cfg.test_train_split*data_cfg.Nruns)
     
     train_inds = np.random.choice(data_cfg.Nruns, size=Ntrain, replace=False)
@@ -33,6 +35,12 @@ def test_train_split(data_cfg, train_cfg):
     
     train_cfg.Ntrain = len(train_inds)
     train_cfg.Nval   = len(val_inds)
+    
+    param_cfg.train_min_scales = param_cfg.min_scales[:,:,train_inds]
+    param_cfg.train_max_scales = param_cfg.max_scales[:,:,train_inds]
+    
+    param_cfg.val_min_scales = param_cfg.min_scales[:,:,val_inds]
+    param_cfg.val_max_scales = param_cfg.max_scales[:,:,val_inds]
     
     return
 
@@ -66,7 +74,7 @@ def scale_inputs_trajectories(data_cfg, param_cfg, xi, trajectories):
     min_scales  = []
     max_scales  = []
     
-    fig, ax = plt.subplots(1,5)
+    fig, ax = plt.subplots(1,xi.shape[1])
         
     itr = 0 
      
@@ -78,9 +86,6 @@ def scale_inputs_trajectories(data_cfg, param_cfg, xi, trajectories):
             orig    = unscale_data(scaled_data, min_val, max_val)            
             ax[i].plot(orig, 'rx')
             
-    
-            # min_scales.append(min_val)
-            # max_scales.append(max_val)
     
             xi_scaled[itr,:] = scaled_data
             
@@ -102,7 +107,7 @@ def scale_inputs_trajectories(data_cfg, param_cfg, xi, trajectories):
     
     data_cfg.trajectories_scaled = trajectories_scaled
     param_cfg.xi_scaled          = xi_scaled
-    param_cfg.min_scales         = min_scales
-    param_cfg.max_scales         = max_scales
+    param_cfg.min_scales         = np.array(min_scales)
+    param_cfg.max_scales         = np.array(max_scales)
     
     return 

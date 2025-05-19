@@ -4,71 +4,17 @@ import torch.nn as nn
 import torch.optim as optim
 from . import preprocess
 from . import visualization
+from . import models
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+import os 
 
 #%% Perform Neural ODE training
 def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curric_tol, lr, xi_scaled):
-    def rk4(func, t, dt, y, m):
-        _one_sixth = 1/6
-        half_dt = dt * 0.5
-        
-        k1 = func(t,m, y)
-        k2 = func(t + half_dt, m, y)
-        k3 = func(t + half_dt, m, y)
-        k4 = func(t + dt, m, y)
-    
-        return (k1 + 2 * (k2 + k3) + k4) * dt * _one_sixth
-    
-    class NeuralODE(nn.Module):
-        def __init__(self, func):
-            super().__init__()
-            self.func = func
-    
-        def forward(self, y0, t, solver, m):
-            solution = torch.empty(
-                len(t), *y0.shape, dtype=y0.dtype, device=y0.device)
-            solution[0] = y0
-    
-            j = 1
-            for t0, t1 in zip(t[:-1], t[1:]):
-                dy = solver(self.func, t0, t1 - t0, y0, m)
-                y1 = y0 + dy
-                solution[j] = y1
-                j += 1
-                y0 = y1
-                
-            return solution
-        
-    # define dynamic function
-    class ODEFunc(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.net = nn.Sequential(nn.Linear(NXiFeatures + 1 + Nvars, network_width),
-                                      nn.Tanh(),
-                                      nn.Linear(network_width, network_width),
-                                      nn.Tanh(),      
-                                      nn.Linear(network_width, Nvars))
-        def forward(self, t, xi, y):
-            
-            # This needs to be cleaned up
-            
-            t       = t.unsqueeze(0)#.unsqueeze(1)#.unsqueeze(2)
-            t       = t.repeat(y.shape[0], 1)
-            xi       = xi.transpose()
-            xi       = torch.from_numpy(xi)
-            y       = y.squeeze(2)
-            y       = y.squeeze(1)
-            txiy      = torch.cat((t, xi,y), dim=1).float()       
-            txiy      = txiy.unsqueeze(1).squeeze(-1)
-            # print('T shape:', t.shape, 'm.shape', m.shape, 'y.shape', y.shape)
-            output  = self.net(txiy)
-    
-            return output
-        
+      
     #% Initialize Model and Optimizer
-    node        = NeuralODE(func=ODEFunc()) # Move Neural ODE to GPU
+    node        = models.NeuralODE(func=models.ODEFunc(NXiFeatures, Nvars,network_width)) # Move Neural ODE to GPU
     optimizer = optim.Adam(node.parameters(), lr=lr)
 
 
@@ -90,6 +36,22 @@ def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curri
     
     batch_size     = config.train_cfg.batch_size
     
+    train_viz_ind   = np.random.choice(config.train_cfg.Ntrain, size=5, replace=False)
+    val_viz_ind     = np.random.choice(config.train_cfg.Nval, size=5, replace=False)
+    
+    
+    #%% Save 
+    # Save PyTorch tensors
+    torch.save({
+        'train_trajects': train_trajects,
+        'val_trajects': val_trajects
+    }, 'output/torch_data.pt')
+    
+    # Save NumPy arrays
+    np.savez('output/numpy_data.npz', 
+             train_xi=train_xi, 
+             val_xi=val_xi)
+
     #%% Training Loop
     loss_func       = []
     img_itr         = 0
@@ -135,7 +97,7 @@ def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curri
         
         #%%
 
-        pred_y = node(y0=batch_y0, t=batch_t, solver=rk4, m = input_xi)
+        pred_y = node(y0=batch_y0, t=batch_t, solver=models.rk4, m = input_xi)
 
         pred_y = pred_y.squeeze(-1).squeeze(2)
 
@@ -147,45 +109,63 @@ def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curri
 
         loss_func.append(loss.detach().numpy())
 
-        if iter % 500 == 1:
+        if iter % 100 == 1:
             with torch.no_grad():
                 plt.close('all')
                 
-                
-                
+                #%% Training 
                 # Select parameteters
-                ind     = [0,1,2,3,4]#,-3,-2,-1]
-            
-                input_xi = train_xi[:,ind]
+                input_xi = train_xi[:,train_viz_ind]
                 
                 
                 # Generate arguments
-                batch_y0 = train_trajects[0,:, ind].t()
+                batch_y0 = train_trajects[0,:, train_viz_ind].t()
                 batch_y0 = batch_y0.unsqueeze(1)
                  
                 batch_t = t[:]
                 
-                batch_y  = train_trajects[:,:, ind]
+                batch_y  = train_trajects[:,:, train_viz_ind]
 
                 batch_y  = batch_y.permute(0, 2, 1)
 
-                #%% Implement curriculum
+                # Implement curriculum
                 batch_t = batch_t[:upper_ind]
-                batch_y = batch_y[:upper_ind,:,:]
-                
-                
-                fig, ax = plt.subplots(2,2)
-                
-                pred_y = node(y0=batch_y0, t=batch_t, solver=rk4, m = input_xi)
-
-                plt.subplots_adjust(wspace = 0.3)
-                
-                pred_y = pred_y.squeeze(-1).squeeze(2)
+                batch_y_train = batch_y[:upper_ind,:,:]
                    
-                #%% Full data
-                visualization.viz_training(ax, batch_t, batch_y, pred_y, t, train_trajects, img_itr)
+                pred_y = node(y0=batch_y0, t=batch_t, solver=models.rk4, m = input_xi)
                 
-                loss = torch.mean(torch.abs(pred_y - batch_y)**2)
+                pred_y_train = pred_y.squeeze(-1).squeeze(2)
+                
+                #%% Validation 
+                # Select parameteters
+                input_xi = val_xi[:,val_viz_ind]
+                
+                
+                # Generate arguments
+                batch_y0 = val_trajects[0,:, val_viz_ind].t()
+                batch_y0 = batch_y0.unsqueeze(1)
+                 
+                batch_t  = t[:]
+                
+                batch_y  = val_trajects[:,:, val_viz_ind]
+
+                batch_y  = batch_y.permute(0, 2, 1)
+
+                # Implement curriculum
+                batch_t = batch_t[:upper_ind]
+                batch_y_val = batch_y[:upper_ind,:,:]
+                   
+                pred_y = node(y0=batch_y0, t=batch_t, solver=models.rk4, m = input_xi)
+                
+                pred_y_val = pred_y.squeeze(-1).squeeze(2)
+                
+                #%% Viz
+                visualization.viz_training(batch_t, batch_y_train, pred_y_train,batch_y_val, pred_y_val, t, img_itr)
+                
+                
+                
+                #%% Report 
+                loss = torch.mean(torch.abs(pred_y_train - batch_y_train)**2)
                 print('Iter {:04d} | Total Loss {:.6f}'.format(iter, loss.item()))
                 sys.stdout.flush()  # Force output to appear immediately 
                 
@@ -194,25 +174,40 @@ def train(config,NXiFeatures,network_width, Nvars,trajectories, max_iters, curri
                 img_itr += 1
                 
                     
-        if iter % 20000 == 1:
+        if iter % 2000 == 1:
                  #%% Saving
                  # training history for validation
-                 save_string = 'LossFunc_niter_' + '{:2d}'.format(max_iters) + '_width_' + '{:2d}'.format(network_width) + '.npz'
-                 np.savez(save_string, loss_func = loss_func)
+                 output_dir = 'output'
+                 loss_dir = os.path.join(output_dir, 'Loss')
+                
+                 # Create directories if they don't exist
+                 os.makedirs(loss_dir, exist_ok=True)
+
+                 # Create the save string
+                 save_string = f'LossFunc_niter_{max_iters:02d}_width_{network_width:02d}.npz'
+                
+                 # Full path for saving
+                 save_path = os.path.join(loss_dir, save_string)
+                
+                 # Save the file
+                 np.savez(save_path, loss_func = loss_func)
          
                  # model
-                 torch.save(node.state_dict(), 'neural_ode_model.pth')
+                 torch.save(node.state_dict(), 'output/neural_ode_model.pth')
          
                  # save compression de-compression
-                 np.savez('min_max_scales.npz', min_scales = config.param_cfg.min_scales, max_scales = config.param_cfg.max_scales)
+                 np.savez('output/min_max_scales.npz', min_scales = config.param_cfg.min_scales, max_scales = config.param_cfg.max_scales)
 
-        #%% Saving
-        # training history for validation
-        save_string = 'LossFunc_niter_' + '{:2d}'.format(max_iters) + '_width_' + '{:2d}'.format(network_width) + '.npz'
-        np.savez(save_string, loss_func = loss_func)
-                
-        # model
-        torch.save(node.state_dict(), 'neural_ode_model.pth')
-
-        # save compression de-compression
-        np.savez('min_max_scales.npz', min_scales = config.param_cfg.min_scales, max_scales = config.param_cfg.max_scales)
+    #%% Saving
+    # training history for validation
+    # Create the save string
+    save_string = f'LossFunc_niter_{max_iters:02d}_width_{network_width:02d}.npz'
+    # Full path for saving
+    save_path = os.path.join(loss_dir, save_string)
+    np.savez(save_path, loss_func = loss_func)
+            
+    # model
+    torch.save(node.state_dict(), 'output/neural_ode_model.pth')
+        
+    # save compression de-compression
+    np.savez('output/min_max_scales.npz', min_scales = config.param_cfg.min_scales, max_scales = config.param_cfg.max_scales)
